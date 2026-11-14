@@ -1,0 +1,6 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# ปิดเซิร์ฟเวอร์และปล่อย wakelock
+pkill -f "python app.py"
+termux-wake-unlock
+echo "ปิด YT2MP3 แล้ว"
+sleep 1

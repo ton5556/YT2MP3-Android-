@@ -1,0 +1,27 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Temporary downloads
+downloads/
+*.mp3
+*.mp4
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/

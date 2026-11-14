@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YouTube เป็น MP3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#e8edf1; --panel:#f7f9fa; --ink:#14202b; --muted:#5b6b78;
+  --line:#c9d3da; --accent:#0e7c86; --accent-ink:#ffffff;
+  --bar-off:#c3cfd6; --warn:#8a5a00; --warn-bg:#fbefd2; --err:#a22a2a;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0f1a22; --panel:#17252f; --ink:#e6eef3; --muted:#92a4b1;
+    --line:#2b3d4a; --accent:#3fc1cc; --accent-ink:#06242a;
+    --bar-off:#2b3d4a; --warn:#f0c569; --warn-bg:#3a2f12; --err:#ff8a8a;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"IBM Plex Sans Thai",system-ui,sans-serif; line-height:1.6;
+  min-height:100vh; display:flex; justify-content:center; padding:32px 16px;
+}
+main{width:100%; max-width:640px}
+h1{font-size:2rem; line-height:1.2; margin:0 0 6px; font-weight:700}
+.sub{color:var(--muted); margin:0 0 28px}
+.panel{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:20px}
+label{display:block; font-weight:500; margin-bottom:8px}
+.row{display:flex; gap:10px}
+input[type=url]{
+  flex:1; min-width:0; font:inherit; color:var(--ink); background:var(--bg);
+  border:1px solid var(--line); border-radius:10px; padding:12px 14px;
+}
+button{
+  font:inherit; font-weight:500; cursor:pointer; border-radius:10px;
+  border:1px solid var(--accent); background:var(--accent); color:var(--accent-ink);
+  padding:12px 18px;
+}
+button.ghost{background:transparent; color:var(--accent)}
+button:disabled{opacity:.5; cursor:not-allowed}
+:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+
+.wave{display:flex; align-items:center; gap:3px; height:72px; margin:22px 0 10px}
+.wave i{flex:1; background:var(--bar-off); border-radius:2px; transition:background .25s}
+.wave i.on{background:var(--accent)}
+.stage{display:flex; justify-content:space-between; color:var(--muted); font-size:.95rem}
+#result{margin-top:22px; display:none}
+#title{font-weight:700; font-size:1.1rem; margin:0 0 4px; overflow-wrap:anywhere}
+.license{display:inline-block; font-size:.9rem; padding:2px 10px; border-radius:99px; border:1px solid var(--line); color:var(--muted)}
+.license.cc{border-color:var(--accent); color:var(--accent)}
+.notice{background:var(--warn-bg); color:var(--warn); border-radius:10px; padding:10px 12px; margin:12px 0 0; font-size:.95rem}
+.actions{display:flex; flex-wrap:wrap; gap:10px; margin-top:16px}
+.hint{color:var(--muted); font-size:.9rem; margin:12px 0 0}
+#error{color:var(--err); margin:14px 0 0; display:none}
+footer{color:var(--muted); font-size:.85rem; margin-top:22px}
+@media (max-width:480px){ .row{flex-direction:column} h1{font-size:1.6rem} }
+@media (prefers-reduced-motion: reduce){ .wave i{transition:none} }
+</style>
+</head>
+<body>
+<main>
+  <h1>YouTube เป็น MP3</h1>
+  <p class="sub">วางลิงก์ แปลงเป็นไฟล์เสียง แล้วบันทึกลงเครื่องหรือ SD card</p>
+
+  <section class="panel">
+    <label for="url">ลิงก์ YouTube</label>
+    <div class="row">
+      <input id="url" type="url" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off">
+      <button id="go">แปลงเป็น MP3</button>
+    </div>
+    <p id="error" role="alert"></p>
+
+    <div class="wave" id="wave" aria-hidden="true"></div>
+    <div class="stage"><span id="stage">รอลิงก์</span><span id="pct">0%</span></div>
+
+    <div id="result">
+      <p id="title"></p>
+      <span id="license" class="license"></span>
+      <p id="notice" class="notice" style="display:none">
+        คลิปนี้ไม่ได้ระบุสัญญาอนุญาตแบบ Creative Commons — ใช้เฉพาะเนื้อหาที่คุณมีสิทธิ์ใช้งาน
+      </p>
+      <div class="actions">
+        <button id="dl">ดาวน์โหลด</button>
+        <button id="save" class="ghost" style="display:none">เลือกที่บันทึก (SD card / โฟลเดอร์)</button>
+      </div>
+      <p class="hint" id="hint"></p>
+    </div>
+  </section>
+  <footer>ไฟล์ที่แปลงแล้วจะถูกลบจากเครื่องเซิร์ฟเวอร์อัตโนมัติหลัง 1 ชั่วโมง · ความยาวสูงสุด {{ max_min }} นาที</footer>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const BARS = 48;
+const wave = $('wave');
+for (let i = 0; i < BARS; i++) {
+  const b = document.createElement('i');
+  // ความสูงคงที่แบบสุ่มเทียม เพื่อให้เหมือนคลื่นเสียง
+  b.style.height = (22 + Math.abs(Math.sin(i * 1.7) * 55 + Math.cos(i * .6) * 20)) + '%';
+  wave.appendChild(b);
+}
+const bars = [...wave.children];
+function setProgress(p){
+  $('pct').textContent = p + '%';
+  const n = Math.round(p / 100 * BARS);
+  bars.forEach((b, i) => b.classList.toggle('on', i < n));
+}
+const STAGES = {starting:'กำลังเริ่ม…', downloading:'กำลังดึงเสียง…', converting:'กำลังแปลงเป็น MP3…', done:'เสร็จแล้ว'};
+
+let jobId = null, filename = 'audio.mp3';
+const canPick = 'showSaveFilePicker' in window && window.isSecureContext;
+$('save').style.display = canPick ? '' : 'none';
+$('hint').textContent = canPick
+  ? 'ปุ่ม "เลือกที่บันทึก" ให้คุณเลือกไดรฟ์ SD card ได้โดยตรง'
+  : (/Android/.test(navigator.userAgent)
+      ? 'เลือกที่เก็บ/SD card: Chrome ⋮ → ตั้งค่า → ดาวน์โหลด → เปิด "Ask where to save files" แล้วทุกครั้งที่กดดาวน์โหลดจะให้เลือกที่เก็บ'
+      : 'ถ้าต้องการเก็บลง SD card: เปิดตั้งค่าเบราว์เซอร์ "ถามก่อนว่าจะบันทึกที่ไหน" หรือย้ายไฟล์ภายหลัง');
+
+function showError(msg){ const e = $('error'); e.textContent = msg; e.style.display = msg ? 'block' : 'none'; }
+
+$('go').onclick = async () => {
+  showError(''); $('result').style.display = 'none'; setProgress(0);
+  const url = $('url').value.trim();
+  if (!url) return showError('กรุณาวางลิงก์ YouTube');
+  $('go').disabled = true; $('stage').textContent = STAGES.starting;
+  try {
+    const r = await fetch('/api/convert', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'เกิดข้อผิดพลาด');
+    jobId = j.id; poll();
+  } catch (e) { showError(e.message); $('go').disabled = false; $('stage').textContent = 'รอลิงก์'; }
+};
+
+async function poll(){
+  try {
+    const j = await (await fetch('/api/status/' + jobId)).json();
+    setProgress(j.progress || 0);
+    $('stage').textContent = STAGES[j.stage] || '';
+    if (j.stage === 'error') { showError(j.error); $('go').disabled = false; return; }
+    if (j.stage === 'done') { finish(j); return; }
+  } catch (e) { showError('เชื่อมต่อเซิร์ฟเวอร์ไม่ได้'); $('go').disabled = false; return; }
+  setTimeout(poll, 800);
+}
+
+function finish(j){
+  filename = j.filename;
+  $('title').textContent = j.title;
+  const lic = $('license');
+  lic.textContent = 'สัญญาอนุญาต: ' + j.license;
+  lic.classList.toggle('cc', !!j.is_cc);
+  $('notice').style.display = j.is_cc ? 'none' : 'block';
+  $('result').style.display = 'block';
+  $('go').disabled = false;
+}
+
+$('dl').onclick = () => { location.href = '/download/' + jobId; };
+
+$('save').onclick = async () => {
+  try {
+    // ต้องเรียกตัวเลือกไฟล์ก่อน (ต้องเกิดจากการกดของผู้ใช้โดยตรง)
+    const handle = await showSaveFilePicker({
+      suggestedName: filename,
+      types: [{description: 'MP3 audio', accept: {'audio/mpeg': ['.mp3']}}]
+    });
+    const res = await fetch('/download/' + jobId);
+    const w = await handle.createWritable();
+    await res.body.pipeTo(w);
+    $('hint').textContent = 'บันทึกเรียบร้อยแล้ว';
+  } catch (e) {
+    if (e.name !== 'AbortError') showError('บันทึกไม่สำเร็จ: ' + e.message);
+  }
+};
+</script>
+</body>
+</html>

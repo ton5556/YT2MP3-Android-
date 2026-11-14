@@ -1,0 +1,17 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# เปิดเซิร์ฟเวอร์ (ถ้ายังไม่เปิด) แล้วเปิดหน้าเว็บใน Chrome
+APP_DIR="__APP_DIR__"
+URL="http://localhost:5000"
+
+termux-wake-lock
+
+if ! curl -s -o /dev/null "$URL"; then
+  cd "$APP_DIR" || exit 1
+  HOST=127.0.0.1 nohup python app.py > "$HOME/yt2mp3.log" 2>&1 &
+  for i in $(seq 1 30); do
+    curl -s -o /dev/null "$URL" && break
+    sleep 0.5
+  done
+fi
+
+termux-open-url "$URL"
